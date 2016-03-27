@@ -30,6 +30,7 @@ def fetch(forceFetch = False):
                     'id': d['id'],
                     'ingredients': [i['id'] for i in d['ingredients']],
                     'tastes': [t['id'] for t in d['tastes']],
+                    'tools': [t['id'] for t in d['tools']]
                 })
             if 'next' in response.keys():
                 next = response['next']
