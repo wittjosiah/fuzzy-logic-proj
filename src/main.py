@@ -1,4 +1,3 @@
-from profileAbsolutData import profile
+import fuzzy
 
-profile()
-
+ratings = fuzzy.run()

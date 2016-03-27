@@ -4,9 +4,9 @@ import json
 from string import Template
 
 def fetch(forceFetch = False):
-    directory = '../data/'
+    directory = '../datasets/'
     fileName = directory + 'data.json'
-    drinks = {}
+    drinks = []
     if not forceFetch and os.path.isfile(fileName):
         with open(fileName) as fp:
             drinks = json.load(fp)
@@ -26,21 +26,24 @@ def fetch(forceFetch = False):
             r = requests.get(next)
             response = r.json()
             for d in response['result']:
-                drinks[d['id']] = d
+                drinks.append({
+                    'id': d['id'],
+                    'ingredients': [i['id'] for i in d['ingredients']],
+                    'tastes': [t['id'] for t in d['tastes']],
+                })
             if 'next' in response.keys():
                 next = response['next']
             else:
                 next = ''
 
-        print(len(drinks.keys()), ' drinks from the Absolut API')
+        print(len(drinks), ' drinks from the Absolut API')
 
         if not os.path.exists(directory):
             os.makedirs(directory)
         with open(fileName, 'w') as fp:
-            json.dump(drinks, fp, sort_keys=True, indent=2)
+            # json.dump(drinks, fp, sort_keys=True, indent=2)
+            json.dump(drinks, fp, sort_keys=True)
 
         print("Saved drinks data")
 
     return drinks
-
-
