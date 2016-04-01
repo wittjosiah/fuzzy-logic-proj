@@ -4,6 +4,7 @@ import os
 import json
 import numpy as np
 import skfuzzy as fuzz
+import math
 
 def fuzzyDistance(drink1, drink2):
   commonIngredients = getCommonPercentage(
@@ -154,7 +155,7 @@ def getDrinkDistances(drinkPairs, drinkDict):
   total = len(drinkPairs)
   for (drink1, drink2) in drinkPairs:
     count += 1
-    if (count % 10000 == 0):
+    if count % 10000 == 0:
       print('.', end = '', flush = True)
     d1 = drinkDict[drink1]
     d2 = drinkDict[drink2]
@@ -163,8 +164,8 @@ def getDrinkDistances(drinkPairs, drinkDict):
 
 def getCommonPercentage(drink1, drink2):
   common = len(set(drink1).intersection(set(drink2)))
-  percent1 = common / len(drink1)
-  percent2 = common / len(drink2)
+  percent1 = common / len(drink1) if len(drink1) > 0 else 0
+  percent2 = common / len(drink2) if len(drink2) > 0 else 0
   percent = (percent1 + percent2) / 2
   return int(percent * 100)
 
@@ -213,6 +214,29 @@ def inferRatings(drinks, drinkDistances, userRatings, forceCalc = False):
 
   return ratingEstimates
 
+def getTopRatings(ratings, drinkDistances):
+  sortedRatings = sorted(ratings.items(), key = lambda r: r[1], reverse = True)
+  topRatings = sortedRatings[0:25]
+  p = []
+  leastSimilar = 0
+  leastSimilarity = math.inf
+  count = 0
+  for perm in itertools.permutations(topRatings, 5):
+    p.append(perm)
+    similarity = 0
+    for r1 in perm:
+      for r2 in perm:
+        if r1[0] < r2[0]:
+          similarity += drinkDistances[str((r1[0], r2[0]))]
+    similarity /= 10
+    if similarity < leastSimilarity:
+      leastSimilarity = similarity
+      leastSimilar = len(p) - 1
+
+  print("Average Similarity:", leastSimilarity)
+
+  return p[leastSimilar]
+
 def run():
   drinks = fetch()
   # drinks = drinks[0:100]
@@ -237,4 +261,4 @@ def run():
   ratings = inferRatings(drinkDict, drinkDistances, userRatings, True)
   print("Estimated Ratings:", len(ratings.keys()))
 
-  return ratings
+  return getTopRatings(ratings, drinkDistances)
