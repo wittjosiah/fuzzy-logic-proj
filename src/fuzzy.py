@@ -1,15 +1,44 @@
-from absolutDataFetch import fetch
 import itertools
 import os
-import json
 import numpy as np
 import skfuzzy as fuzz
 import math
+import requests
+from string import Template
+
+def fetch():
+  drinks = []
+  apiKey = os.environ['ABSOLUT_API_KEY']
+  start = 0
+  pageSize = 100
+  url = Template('http://addb.absolutdrinks.com/drinks/' +
+    '?apiKey=$apiKey&start=$start&pageSize=$pageSize')
+  next = url.substitute(
+    apiKey = apiKey,
+    start = str(start),
+    pageSize = str(pageSize))
+  print('Fetching', end = '', flush = True)
+  while next != '':
+    print('.', end = '', flush = True)
+    r = requests.get(next)
+    response = r.json()
+    for d in response['result']:
+      drinks.append({
+        'id': d['id'],
+        'ingredients': [i['id'] for i in d['ingredients']],
+        'tastes': [t['id'] for t in d['tastes']],
+        'tools': [t['id'] for t in d['tools']]
+      })
+    if 'next' in response.keys():
+      next = response['next']
+    else:
+      next = ''
+  print(len(drinks), ' drinks from the Absolut API')
+  return drinks
+
 
 def fuzzyDistance(drink1, drink2):
-  commonIngredients = getCommonPercentage(
-    drink1['ingredients'],
-    drink2['ingredients'])
+  commonIngredients = getCommonPercentage(drink1['ingredients'], drink2['ingredients'])
   commonTastes = getCommonPercentage(drink1['tastes'], drink2['tastes'])
   commonTools = getCommonPercentage(drink1['tools'], drink2['tools'])
   x = np.arange(101)
@@ -24,122 +53,93 @@ def fuzzyDistance(drink1, drink2):
   closeByTools = fuzz.trapmf(x, [70, 80, 100, 100])
   lowSim = fuzz.trapmf(x, [0, 0, 40, 60])
   highSim = fuzz.trapmf(x, [40, 60, 100, 100])
-
   fuzzyDist = []
-
   # If far by tools and far by ingredients and far by tastes then low similarity
   tNorm = min(farByTools[commonTools], farByIngredients[commonIngredients], farByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If far by tools and far by ingredients and avg by tastes then low similarity
   tNorm = min(farByTools[commonTools], farByIngredients[commonIngredients], avgByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If far by tools and far by ingredients and close by tastes then low similarity
   tNorm = min(farByTools[commonTools], farByIngredients[commonIngredients], closeByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If far by tools and avg by ingredients and far by tastes then low similarity
   tNorm = min(farByTools[commonTools], avgByIngredients[commonIngredients], farByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If far by tools and avg by ingredients and avg by tastes then low similarity
   tNorm = min(farByTools[commonTools], avgByIngredients[commonIngredients], avgByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If far by tools and avg by ingredients and close by tastes then low similarity
   tNorm = min(farByTools[commonTools], avgByIngredients[commonIngredients], closeByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If far by tools and close by ingredients and far by tastes then low similarity
   tNorm = min(farByTools[commonTools], closeByIngredients[commonIngredients], farByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If far by tools and close by ingredients and avg by tastes then low similarity
   tNorm = min(farByTools[commonTools], closeByIngredients[commonIngredients], avgByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If far by tools and close by ingredients and close by tastes then high similarity
   tNorm = min(farByTools[commonTools], closeByIngredients[commonIngredients], closeByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in highSim])
-
   # If avg by tools and far by ingredients and far by tastes then low similarity
   tNorm = min(avgByTools[commonTools], farByIngredients[commonIngredients], farByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If avg by tools and far by ingredients and avg by tastes then low similarity
   tNorm = min(avgByTools[commonTools], farByIngredients[commonIngredients], avgByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If avg by tools and far by ingredients and close by tastes then low similarity
   tNorm = min(avgByTools[commonTools], farByIngredients[commonIngredients], closeByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If avg by tools and avg by ingredients and far by tastes then low similarity
   tNorm = min(avgByTools[commonTools], avgByIngredients[commonIngredients], farByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If avg by tools and avg by ingredients and avg by tastes then high similarity
   tNorm = min(avgByTools[commonTools], avgByIngredients[commonIngredients], avgByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in highSim])
-
   # If avg by tools and avg by ingredients and close by tastes then high similarity
   tNorm = min(avgByTools[commonTools], avgByIngredients[commonIngredients], closeByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in highSim])
-
   # If avg by tools and close by ingredients and far by tastes then low similarity
   tNorm = min(avgByTools[commonTools], closeByIngredients[commonIngredients], farByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If avg by tools and close by ingredients and avg by tastes then high similarity
   tNorm = min(avgByTools[commonTools], closeByIngredients[commonIngredients], avgByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in highSim])
-
   # If avg by tools and close by ingredients and close by tastes then high similarity
   tNorm = min(avgByTools[commonTools], closeByIngredients[commonIngredients], closeByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in highSim])
-
   # If close by tools and far by ingredients and far by tastes then low similarity
   tNorm = min(closeByTools[commonTools], farByIngredients[commonIngredients], farByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If close by tools and far by ingredients and avg by tastes then low similarity
   tNorm = min(closeByTools[commonTools], farByIngredients[commonIngredients], avgByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If close by tools and far by ingredients and close by tastes then low similarity
   tNorm = min(closeByTools[commonTools], farByIngredients[commonIngredients], closeByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If close by tools and avg by ingredients and far by tastes then low similarity
   tNorm = min(closeByTools[commonTools], avgByIngredients[commonIngredients], farByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If close by tools and avg by ingredients and avg by tastes then low similarity
   tNorm = min(closeByTools[commonTools], avgByIngredients[commonIngredients], avgByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in highSim])
-
   # If close by tools and avg by ingredients and close by tastes then high similarity
   tNorm = min(closeByTools[commonTools], avgByIngredients[commonIngredients], closeByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in highSim])
-
   # If close by tools and close by ingredients and far by tastes then low similarity
   tNorm = min(closeByTools[commonTools], closeByIngredients[commonIngredients], farByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in lowSim])
-
   # If close by tools and close by ingredients and avg by tastes then high similarity
   tNorm = min(closeByTools[commonTools], closeByIngredients[commonIngredients], avgByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in highSim])
-
   # If close by tools and close by ingredients and close by tastes then high similarity
   tNorm = min(closeByTools[commonTools], closeByIngredients[commonIngredients], closeByTastes[commonTastes])
   fuzzyDist.append([d if d <= tNorm else tNorm for d in highSim])
-
   unionDist = [0] * 101
   for dist in fuzzyDist:
     (x, unionDist) = fuzz.fuzzy_or(x, unionDist, x, dist)
-
   return fuzz.defuzzify.centroid(x, np.array(unionDist))
+
 
 def getDrinkPairs(drinks):
   drinkPairs = []
@@ -148,6 +148,7 @@ def getDrinkPairs(drinks):
           if drink1['id'] < drink2['id']:
               drinkPairs.append((drink1['id'], drink2['id']))
   return drinkPairs
+
 
 def getDrinkDistances(drinkPairs, drinkDict):
   drinkDistances = {}
@@ -162,6 +163,7 @@ def getDrinkDistances(drinkPairs, drinkDict):
     drinkDistances[str((drink1, drink2))] = fuzzyDistance(d1, d2)
   return drinkDistances
 
+
 def getCommonPercentage(drink1, drink2):
   common = len(set(drink1).intersection(set(drink2)))
   percent1 = common / len(drink1) if len(drink1) > 0 else 0
@@ -169,24 +171,8 @@ def getCommonPercentage(drink1, drink2):
   percent = (percent1 + percent2) / 2
   return int(percent * 100)
 
-def fuzzySim(drinkPairs, drinkDict, force = False):
-  directory = '../datasets/'
-  fileName = directory + 'dist.json'
-  drinkDistances = {}
-  if not force and os.path.isfile(fileName):
-    with open(fileName) as fp:
-      drinkDistances = json.load(fp)
-  else:
-    drinkDistances = getDrinkDistances(drinkPairs, drinkDict)
-    if not os.path.exists(directory):
-      os.makedirs(directory)
-    with open(fileName, 'w') as fp:
-      json.dump(drinkDistances, fp, sort_keys=True)
-  return drinkDistances
 
 def inferRatings(drinks, drinkDistances, userRatings, forceCalc = False):
-  directory = '../datasets/'
-  fileName = directory + 'ratings.json'
   ratingEstimates = {}
   for drink in drinks.keys():
     if drink not in userRatings.keys():
@@ -206,13 +192,8 @@ def inferRatings(drinks, drinkDistances, userRatings, forceCalc = False):
           ratingEstimate += s[1] * userRatings[s[0]]
         ratingEstimate /= simSum
       ratingEstimates[drink] = ratingEstimate
-
-  if not os.path.exists(directory):
-    os.makedirs(directory)
-  with open(fileName, 'w') as fp:
-    json.dump(ratingEstimates, fp, sort_keys=True)
-
   return ratingEstimates
+
 
 def getTopRatings(ratings, drinkDistances):
   sortedRatings = sorted(ratings.items(), key = lambda r: r[1], reverse = True)
@@ -232,14 +213,12 @@ def getTopRatings(ratings, drinkDistances):
     if similarity < leastSimilarity:
       leastSimilarity = similarity
       leastSimilar = len(p) - 1
-
   print("Average Similarity:", leastSimilarity)
-
   return p[leastSimilar]
+
 
 def run():
   drinks = fetch()
-  # drinks = drinks[0:100]
   drinkDict = {}
   for key, group in itertools.groupby(drinks, lambda d: d['id']):
     drinkDict[key] = list(group)[0]
@@ -248,7 +227,7 @@ def run():
   drinkPairs = getDrinkPairs(drinks)
   print("Drink Pairs:", len(drinkPairs))
 
-  drinkDistances = fuzzySim(drinkPairs, drinkDict)
+  drinkDistances = getDrinkDistances(drinkPairs, drinkDict)
   print("Drink Distances:", len(drinkDistances.keys()))
 
   userRatings = {
